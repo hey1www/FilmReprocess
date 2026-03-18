@@ -1,0 +1,544 @@
+import { create } from "zustand";
+import { analyzeHalfFrame } from "../services/imagePipeline";
+import { createEmptyProject, defaultColorRecipe, defaultProcessingRecipe } from "../services/defaults";
+import { generateThumbnailBlob } from "../services/imageCodec";
+import { openDirectoryImages } from "../services/fileAccess";
+import { mergeMetadata } from "../services/metadataMerge";
+import { loadFileHandle, loadProjectSnapshot, loadThumbnail, persistFileHandle, persistProjectSnapshot, persistThumbnail } from "../services/persistence";
+import type {
+  AppSection,
+  Asset,
+  BatchMetadataPatch,
+  ColorRecipe,
+  ExportSettings,
+  JobStatus,
+  Locale,
+  MetadataMergeStrategy,
+  PreviewTarget,
+  ProjectSnapshot,
+  Rect,
+} from "../types/models";
+import { createId } from "../utils/id";
+
+type ImportFileEntry = {
+  file: File;
+  relativePath?: string;
+  handleId?: string;
+  handle?: FileSystemFileHandle;
+};
+
+type CreatedAssetEntry = {
+  asset: Asset;
+  file: File;
+  thumbnailUrl: string;
+};
+
+type AppStore = {
+  ready: boolean;
+  project: ProjectSnapshot;
+  locale: Locale;
+  section: AppSection;
+  selectedAssetIds: string[];
+  activeAssetId: string | null;
+  searchQuery: string;
+  previewTarget: PreviewTarget;
+  jobs: JobStatus[];
+  sessionFiles: Record<string, File>;
+  thumbnailUrls: Record<string, string>;
+  bootstrap: () => Promise<void>;
+  setLocale: (locale: Locale) => void;
+  setSection: (section: AppSection) => void;
+  setSearchQuery: (query: string) => void;
+  setPreviewTarget: (target: PreviewTarget) => void;
+  setProjectName: (name: string) => void;
+  importFiles: (files: ImportFileEntry[]) => Promise<void>;
+  importFromDirectory: () => Promise<void>;
+  selectAsset: (assetId: string, multi?: boolean) => void;
+  selectAssetRange: (assetId: string) => void;
+  clearSelection: () => void;
+  selectAll: () => void;
+  updateMetadata: (
+    assetIds: string[],
+    patch: BatchMetadataPatch,
+    strategy: MetadataMergeStrategy,
+    selectedFields: Array<keyof BatchMetadataPatch>,
+  ) => void;
+  updateSplit: (
+    assetId: string,
+    updater: (asset: Asset) => Asset,
+  ) => void;
+  autoDetectSplit: (assetIds: string[]) => Promise<void>;
+  copySplitToSelected: (sourceAssetId: string) => void;
+  updateColor: (assetIds: string[], patch: Partial<ColorRecipe>) => void;
+  updateExportSettings: (patch: Partial<ExportSettings>) => void;
+  resolveAssetFile: (assetId: string) => Promise<File | null>;
+  addJob: (job: JobStatus) => void;
+  updateJob: (jobId: string, patch: Partial<JobStatus>) => void;
+  removeJob: (jobId: string) => void;
+};
+
+function updateAndPersist(setter: (project: ProjectSnapshot) => ProjectSnapshot) {
+  return (state: AppStore) => {
+    const project = setter(state.project);
+    void persistProjectSnapshot(project);
+    return { project };
+  };
+}
+
+async function hydrateThumbnails(project: ProjectSnapshot) {
+  const nextUrls: Record<string, string> = {};
+
+  for (const asset of project.assets) {
+    const blob = await loadThumbnail(asset.thumbnailKey);
+    if (blob) {
+      nextUrls[asset.id] = URL.createObjectURL(blob);
+    }
+  }
+
+  return nextUrls;
+}
+
+async function createAssetFromFile(entry: ImportFileEntry) {
+  const bitmap = await createImageBitmap(entry.file);
+  const assetId = createId("asset");
+  const thumbnailKey = createId("thumb");
+  const thumbnailBlob = await generateThumbnailBlob(entry.file);
+  await persistThumbnail(thumbnailKey, thumbnailBlob);
+
+  if (entry.handleId && entry.handle) {
+    await persistFileHandle(entry.handleId, entry.handle);
+  }
+
+  const asset: Asset = {
+    id: assetId,
+    originalName: entry.file.name,
+    width: bitmap.width,
+    height: bitmap.height,
+    thumbnailKey,
+    source: {
+      mode: entry.handleId ? "file-handle" : "session-file",
+      fileName: entry.file.name,
+      mimeType: entry.file.type,
+      size: entry.file.size,
+      handleId: entry.handleId,
+      relativePath: entry.relativePath,
+    },
+    metadata: {},
+    recipe: {
+      split: {
+        ...defaultProcessingRecipe.split,
+        leftCrop: {
+          x: 0,
+          y: 0,
+          width: bitmap.width,
+          height: bitmap.height,
+        },
+        rightCrop: {
+          x: Math.floor(bitmap.width / 2),
+          y: 0,
+          width: Math.ceil(bitmap.width / 2),
+          height: bitmap.height,
+        },
+      },
+      color: { ...defaultColorRecipe, curve: [...defaultColorRecipe.curve] },
+    },
+    flags: {
+      autoSplitTried: false,
+      splitAccepted: false,
+    },
+  };
+
+  bitmap.close();
+
+  return {
+    asset,
+    file: entry.file,
+    thumbnailUrl: URL.createObjectURL(thumbnailBlob),
+  };
+}
+
+export const useAppStore = create<AppStore>((set, get) => ({
+  ready: false,
+  project: createEmptyProject(),
+  locale: "zh-CN",
+  section: "library",
+  selectedAssetIds: [],
+  activeAssetId: null,
+  searchQuery: "",
+  previewTarget: "original",
+  jobs: [],
+  sessionFiles: {},
+  thumbnailUrls: {},
+  async bootstrap() {
+    const project = await loadProjectSnapshot();
+    const thumbnailUrls = await hydrateThumbnails(project);
+
+    set({
+      ready: true,
+      project,
+      locale: project.locale,
+      thumbnailUrls,
+      activeAssetId: project.assets[0]?.id ?? null,
+      selectedAssetIds: project.assets[0] ? [project.assets[0].id] : [],
+    });
+  },
+  setLocale(locale) {
+    set((state) => {
+      const nextProject = {
+        ...state.project,
+        locale,
+      };
+      void persistProjectSnapshot(nextProject);
+      return {
+        locale,
+        project: nextProject,
+      };
+    });
+  },
+  setSection(section) {
+    set({ section });
+  },
+  setSearchQuery(searchQuery) {
+    set({ searchQuery });
+  },
+  setPreviewTarget(previewTarget) {
+    set({ previewTarget });
+  },
+  setProjectName(name) {
+    set(updateAndPersist((project) => ({ ...project, name })));
+  },
+  async importFiles(files) {
+    if (files.length === 0) {
+      return;
+    }
+
+    const jobId = createId("job");
+    get().addJob({
+      id: jobId,
+      label: "jobs.importing",
+      progress: 0,
+      stage: "running",
+    });
+
+    const created: CreatedAssetEntry[] = [];
+    for (const [index, entry] of files.entries()) {
+      const result = await createAssetFromFile(entry);
+      created.push(result);
+      get().updateJob(jobId, {
+        progress: (index + 1) / files.length,
+      });
+    }
+
+    set((state) => {
+      const assets = [...state.project.assets, ...created.map((item) => item.asset)];
+      const nextProject = {
+        ...state.project,
+        assets,
+      };
+      void persistProjectSnapshot(nextProject);
+
+      return {
+        project: nextProject,
+        sessionFiles: {
+          ...state.sessionFiles,
+          ...Object.fromEntries(created.map((item) => [item.asset.id, item.file])),
+        },
+        thumbnailUrls: {
+          ...state.thumbnailUrls,
+          ...Object.fromEntries(created.map((item) => [item.asset.id, item.thumbnailUrl])),
+        },
+        activeAssetId: created.at(-1)?.asset.id ?? state.activeAssetId,
+        selectedAssetIds: created.map((item) => item.asset.id),
+      };
+    });
+
+    get().updateJob(jobId, {
+      progress: 1,
+      stage: "success",
+    });
+  },
+  async importFromDirectory() {
+    const entries = await openDirectoryImages();
+    const withHandles = await Promise.all(
+      entries.map(async (entry) => {
+        return {
+          file: entry.file,
+          relativePath: entry.relativePath,
+          handleId: entry.handleId,
+          handle: entry.handle,
+        };
+      }),
+    );
+
+    await get().importFiles(withHandles);
+  },
+  selectAsset(assetId, multi = false) {
+    set((state) => {
+      if (!multi) {
+        return {
+          activeAssetId: assetId,
+          selectedAssetIds: [assetId],
+        };
+      }
+
+      const exists = state.selectedAssetIds.includes(assetId);
+      const selectedAssetIds = exists
+        ? state.selectedAssetIds.filter((currentId) => currentId !== assetId)
+        : [...state.selectedAssetIds, assetId];
+
+      return {
+        activeAssetId: assetId,
+        selectedAssetIds,
+      };
+    });
+  },
+  selectAssetRange(assetId) {
+    set((state) => {
+      if (!state.activeAssetId) {
+        return {
+          activeAssetId: assetId,
+          selectedAssetIds: [assetId],
+        };
+      }
+
+      const assets = state.project.assets;
+      const start = assets.findIndex((asset) => asset.id === state.activeAssetId);
+      const end = assets.findIndex((asset) => asset.id === assetId);
+
+      if (start === -1 || end === -1) {
+        return state;
+      }
+
+      const [from, to] = start < end ? [start, end] : [end, start];
+
+      return {
+        selectedAssetIds: assets.slice(from, to + 1).map((asset) => asset.id),
+        activeAssetId: assetId,
+      };
+    });
+  },
+  clearSelection() {
+    set({
+      selectedAssetIds: [],
+      activeAssetId: null,
+    });
+  },
+  selectAll() {
+    set((state) => ({
+      selectedAssetIds: state.project.assets.map((asset) => asset.id),
+      activeAssetId: state.project.assets[0]?.id ?? null,
+    }));
+  },
+  updateMetadata(assetIds, patch, strategy, selectedFields) {
+    const ids = new Set(assetIds);
+    set(
+      updateAndPersist((project) => ({
+        ...project,
+        assets: project.assets.map((asset) =>
+          ids.has(asset.id) ? mergeMetadata(asset, patch, strategy, selectedFields) : asset,
+        ),
+      })),
+    );
+  },
+  updateSplit(assetId, updater) {
+    set(
+      updateAndPersist((project) => ({
+        ...project,
+        assets: project.assets.map((asset) => (asset.id === assetId ? updater(asset) : asset)),
+      })),
+    );
+  },
+  async autoDetectSplit(assetIds) {
+    if (assetIds.length === 0) {
+      return;
+    }
+
+    const jobId = createId("job");
+    get().addJob({
+      id: jobId,
+      label: "jobs.detecting",
+      progress: 0,
+      stage: "running",
+    });
+
+    for (const [index, assetId] of assetIds.entries()) {
+      const file = await get().resolveAssetFile(assetId);
+
+      if (!file) {
+        continue;
+      }
+
+      const result = await analyzeHalfFrame(file);
+      get().updateSplit(assetId, (asset) => ({
+        ...asset,
+        flags: {
+          autoSplitTried: true,
+          splitAccepted: true,
+        },
+        recipe: {
+          ...asset.recipe,
+          split: {
+            ...asset.recipe.split,
+            mode: "half-frame",
+            confidence: result.confidence,
+            leftCrop: result.leftCrop,
+            rightCrop: result.rightCrop,
+          },
+        },
+      }));
+
+      get().updateJob(jobId, {
+        progress: (index + 1) / assetIds.length,
+      });
+    }
+
+    get().updateJob(jobId, {
+      progress: 1,
+      stage: "success",
+    });
+  },
+  copySplitToSelected(sourceAssetId) {
+    const source = get().project.assets.find((asset) => asset.id === sourceAssetId);
+
+    if (!source) {
+      return;
+    }
+
+    const selectedIds = new Set(get().selectedAssetIds.filter((assetId) => assetId !== sourceAssetId));
+
+    set(
+      updateAndPersist((project) => ({
+        ...project,
+        assets: project.assets.map((asset) => {
+          if (!selectedIds.has(asset.id)) {
+            return asset;
+          }
+
+          return {
+            ...asset,
+            recipe: {
+              ...asset.recipe,
+              split: {
+                ...source.recipe.split,
+                leftCrop: source.recipe.split.leftCrop ? { ...source.recipe.split.leftCrop } : undefined,
+                rightCrop: source.recipe.split.rightCrop ? { ...source.recipe.split.rightCrop } : undefined,
+              },
+            },
+          };
+        }),
+      })),
+    );
+  },
+  updateColor(assetIds, patch) {
+    const ids = new Set(assetIds);
+    set(
+      updateAndPersist((project) => ({
+        ...project,
+        assets: project.assets.map((asset) => {
+          if (!ids.has(asset.id)) {
+            return asset;
+          }
+
+          return {
+            ...asset,
+            recipe: {
+              ...asset.recipe,
+              color: {
+                ...asset.recipe.color,
+                ...patch,
+              },
+            },
+          };
+        }),
+      })),
+    );
+  },
+  updateExportSettings(patch) {
+    set(
+      updateAndPersist((project) => ({
+        ...project,
+        exportSettings: {
+          ...project.exportSettings,
+          ...patch,
+        },
+      })),
+    );
+  },
+  async resolveAssetFile(assetId) {
+    const sessionFile = get().sessionFiles[assetId];
+
+    if (sessionFile) {
+      return sessionFile;
+    }
+
+    const asset = get().project.assets.find((item) => item.id === assetId);
+
+    if (!asset?.source.handleId) {
+      return null;
+    }
+
+    const handle = await loadFileHandle(asset.source.handleId);
+    const file = handle ? await handle.getFile() : null;
+
+    if (file) {
+      set((state) => ({
+        sessionFiles: {
+          ...state.sessionFiles,
+          [assetId]: file,
+        },
+      }));
+    }
+
+    return file;
+  },
+  addJob(job) {
+    set((state) => ({
+      jobs: [job, ...state.jobs.filter((existing) => existing.id !== job.id)].slice(0, 12),
+    }));
+  },
+  updateJob(jobId, patch) {
+    set((state) => ({
+      jobs: state.jobs.map((job) => (job.id === jobId ? { ...job, ...patch } : job)),
+    }));
+  },
+  removeJob(jobId) {
+    set((state) => ({
+      jobs: state.jobs.filter((job) => job.id !== jobId),
+    }));
+  },
+}));
+
+export function useAssets() {
+  return useAppStore((state) => {
+    const query = state.searchQuery.trim().toLowerCase();
+
+    if (!query) {
+      return state.project.assets;
+    }
+
+    return state.project.assets.filter((asset) => {
+      return [
+        asset.originalName,
+        asset.metadata.cameraModel,
+        asset.metadata.scannerModel,
+        asset.metadata.location?.label,
+        asset.metadata.notes,
+      ]
+        .filter(Boolean)
+        .some((value) => value?.toLowerCase().includes(query));
+    });
+  });
+}
+
+export function useActiveAsset() {
+  return useAppStore((state) => {
+    return state.project.assets.find((asset) => asset.id === state.activeAssetId) ?? null;
+  });
+}
+
+export function useSelectedAssets() {
+  return useAppStore((state) => {
+    const selected = new Set(state.selectedAssetIds);
+    return state.project.assets.filter((asset) => selected.has(asset.id));
+  });
+}

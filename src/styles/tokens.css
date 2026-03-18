@@ -1,0 +1,30 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --bg-elevated: #111827;
+  --bg-panel: rgba(15, 23, 42, 0.82);
+  --bg-soft: rgba(30, 41, 59, 0.8);
+  --line: rgba(148, 163, 184, 0.18);
+  --line-strong: rgba(148, 163, 184, 0.3);
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --accent: #f97316;
+  --accent-soft: rgba(249, 115, 22, 0.18);
+  --accent-cool: #38bdf8;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --sidebar-width: 13rem;
+  --rail-width: 18rem;
+  --inspector-width: 22rem;
+}
