@@ -38,6 +38,23 @@ pnpm dev
 pnpm build
 ```
 
+The production build now uses relative asset paths, so the same `dist/` output works on:
+
+- GitHub Pages project sites such as `https://<user>.github.io/<repo>/`
+- GitHub Pages user or organization sites such as `https://<user>.github.io/`
+- Custom domains
+
+No repository-specific rebuild is required.
+
+## Deploy To GitHub Pages
+
+1. Push the repository to GitHub.
+2. In `Settings -> Pages`, set `Source` to `GitHub Actions`.
+3. Keep the default workflow file at [deploy-pages.yml](/Users/heyi/Project/FilmReprocess/.github/workflows/deploy-pages.yml).
+4. Push to `main` or run the workflow manually from the Actions tab.
+
+This project uses relative asset URLs, so the same workflow output works for both repository Pages and `*.github.io` root sites.
+
 ## Test
 
 ```bash

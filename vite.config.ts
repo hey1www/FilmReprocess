@@ -1,12 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const repositoryBase = process.env.GITHUB_REPOSITORY
-  ? `/${process.env.GITHUB_REPOSITORY.split("/")[1]}/`
-  : "/";
-
 export default defineConfig({
-  base: repositoryBase,
+  // Relative asset URLs make the static build work on GitHub Pages project sites,
+  // user/org sites, and custom domains without repository-specific rebuilds.
+  base: "./",
   plugins: [react()],
   build: {
     rollupOptions: {
