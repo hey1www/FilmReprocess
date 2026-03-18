@@ -1,6 +1,6 @@
 import { createId } from "../utils/id";
 
-const imageExtensions = new Set(["jpg", "jpeg", "png", "webp", "tif", "tiff", "bmp"]);
+const imageExtensions = new Set(["jpg", "jpeg", "png", "webp", "tif", "tiff", "bmp", "svg"]);
 
 function isImageName(name: string) {
   const extension = name.split(".").pop()?.toLowerCase();

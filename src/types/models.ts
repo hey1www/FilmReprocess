@@ -65,6 +65,12 @@ export type ColorRecipe = {
   curve: CurvePoint[];
 };
 
+export type ColorPreset = {
+  id: string;
+  name: string;
+  recipe: ColorRecipe;
+};
+
 export type ProcessingRecipe = {
   split: SplitRecipe;
   color: ColorRecipe;
@@ -104,6 +110,7 @@ export type ProjectSnapshot = {
   updatedAt: string;
   assets: Asset[];
   exportSettings: ExportSettings;
+  colorPresets: ColorPreset[];
 };
 
 export type ExportSettings = {

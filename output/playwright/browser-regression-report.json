@@ -1,0 +1,19 @@
+{
+  "baseUrl": "http://127.0.0.1:4173",
+  "completedAt": "2026-03-18T06:51:33.329Z",
+  "desktop": {
+    "screenshots": [
+      "01-library-empty.png",
+      "02-library-imported.png",
+      "03-metadata-applied.png",
+      "04-split-adjusted.png",
+      "05-lab-preset.png",
+      "06-export.png"
+    ],
+    "download": "film-reprocess-project.zip"
+  },
+  "mobile": {
+    "screenshot": "07-mobile-home.png"
+  },
+  "status": "passed"
+}

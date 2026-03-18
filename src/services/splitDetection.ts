@@ -56,6 +56,10 @@ function buildFallbackRect(width: number, height: number, side: "left" | "right"
   };
 }
 
+function mean(values: number[]) {
+  return values.reduce((total, value) => total + value, 0) / Math.max(1, values.length);
+}
+
 export function detectHalfFrameFromImageData(imageData: ImageData): SplitDetectionResult {
   const { width, height, data } = imageData;
 
@@ -68,6 +72,7 @@ export function detectHalfFrameFromImageData(imageData: ImageData): SplitDetecti
   }
 
   const columnEnergy = new Array<number>(width).fill(0);
+  const columnBrightness = new Array<number>(width).fill(0);
   const rowEnergy = new Array<number>(height).fill(0);
 
   for (let y = 1; y < height - 1; y += 1) {
@@ -88,19 +93,26 @@ export function detectHalfFrameFromImageData(imageData: ImageData): SplitDetecti
       const energy = diffX + diffY;
 
       columnEnergy[x] += energy;
+      columnBrightness[x] += luminance;
       rowEnergy[y] += energy;
     }
   }
 
   const smoothColumns = smooth(columnEnergy, Math.max(2, Math.floor(width * 0.012)));
+  const brightnessColumns = smooth(columnBrightness, Math.max(2, Math.floor(width * 0.012)));
+  const normalizedEnergy = normalize(smoothColumns);
+  const normalizedBrightness = normalize(brightnessColumns);
   const centerStart = Math.floor(width * 0.28);
   const centerEnd = Math.floor(width * 0.72);
   let splitX = Math.floor(width / 2);
-  let splitScore = Number.POSITIVE_INFINITY;
+  let splitScore = Number.NEGATIVE_INFINITY;
 
   for (let x = centerStart; x < centerEnd; x += 1) {
-    const score = smoothColumns[x];
-    if (score < splitScore) {
+    const darkness = 1 - normalizedBrightness[x];
+    const edgeQuiet = 1 - normalizedEnergy[x];
+    const score = darkness * 0.7 + edgeQuiet * 0.3;
+
+    if (score > splitScore) {
       splitScore = score;
       splitX = x;
     }
@@ -124,9 +136,22 @@ export function detectHalfFrameFromImageData(imageData: ImageData): SplitDetecti
     height: clamp(verticalBounds.end - verticalBounds.start, height * 0.1, height),
   };
 
-  const normalized = normalize(smoothColumns.slice(centerStart, centerEnd));
-  const median = normalized.sort((left, right) => left - right)[Math.floor(normalized.length / 2)] ?? 1;
-  const confidence = clamp(1 - splitScore / ((median + 0.01) * (Math.max(...smoothColumns) || 1)), 0.15, 0.99);
+  const leftRatio = leftCrop.width / width;
+  const rightRatio = rightCrop.width / width;
+  const balanceScore = 1 - Math.abs(leftRatio - rightRatio);
+  const centerWindow = normalizedBrightness.slice(centerStart, centerEnd);
+  const centerMean = mean(centerWindow);
+  const gapDarkness = clamp(1 - normalizedBrightness[splitX] + centerMean * 0.1, 0, 1);
+  const gapQuietness = clamp(1 - normalizedEnergy[splitX], 0, 1);
+  const confidence = clamp(gapDarkness * 0.5 + gapQuietness * 0.2 + balanceScore * 0.3, 0.15, 0.98);
+
+  if (leftCrop.width < width * 0.14 || rightCrop.width < width * 0.14 || confidence < 0.28) {
+    return {
+      confidence: clamp(confidence * 0.8, 0.12, 0.45),
+      leftCrop: buildFallbackRect(width, height, "left"),
+      rightCrop: buildFallbackRect(width, height, "right"),
+    };
+  }
 
   return {
     confidence,

@@ -1,6 +1,8 @@
-import { create } from "zustand";
+import { useMemo } from "react";
+import { shallow } from "zustand/shallow";
+import { createWithEqualityFn } from "zustand/traditional";
 import { analyzeHalfFrame } from "../services/imagePipeline";
-import { createEmptyProject, defaultColorRecipe, defaultProcessingRecipe } from "../services/defaults";
+import { createDefaultPresets, createEmptyProject, defaultColorRecipe, defaultProcessingRecipe } from "../services/defaults";
 import { generateThumbnailBlob } from "../services/imageCodec";
 import { openDirectoryImages } from "../services/fileAccess";
 import { mergeMetadata } from "../services/metadataMerge";
@@ -70,6 +72,8 @@ type AppStore = {
   autoDetectSplit: (assetIds: string[]) => Promise<void>;
   copySplitToSelected: (sourceAssetId: string) => void;
   updateColor: (assetIds: string[], patch: Partial<ColorRecipe>) => void;
+  saveColorPreset: (name: string, assetId: string) => void;
+  applyColorPreset: (presetId: string, assetIds: string[]) => void;
   updateExportSettings: (patch: Partial<ExportSettings>) => void;
   resolveAssetFile: (assetId: string) => Promise<File | null>;
   addJob: (job: JobStatus) => void;
@@ -157,7 +161,7 @@ async function createAssetFromFile(entry: ImportFileEntry) {
   };
 }
 
-export const useAppStore = create<AppStore>((set, get) => ({
+export const useAppStore = createWithEqualityFn<AppStore>((set, get) => ({
   ready: false,
   project: createEmptyProject(),
   locale: "zh-CN",
@@ -171,6 +175,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   thumbnailUrls: {},
   async bootstrap() {
     const project = await loadProjectSnapshot();
+    if (!project.colorPresets || project.colorPresets.length === 0) {
+      project.colorPresets = createDefaultPresets();
+    }
     const thumbnailUrls = await hydrateThumbnails(project);
 
     set({
@@ -380,6 +387,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           split: {
             ...asset.recipe.split,
             mode: "half-frame",
+            detectorVersion: "v2",
             confidence: result.confidence,
             leftCrop: result.leftCrop,
             rightCrop: result.rightCrop,
@@ -414,14 +422,33 @@ export const useAppStore = create<AppStore>((set, get) => ({
             return asset;
           }
 
+          const widthScale = asset.width / source.width;
+          const heightScale = asset.height / source.height;
+          const leftCrop = source.recipe.split.leftCrop
+            ? {
+                x: source.recipe.split.leftCrop.x * widthScale,
+                y: source.recipe.split.leftCrop.y * heightScale,
+                width: source.recipe.split.leftCrop.width * widthScale,
+                height: source.recipe.split.leftCrop.height * heightScale,
+              }
+            : undefined;
+          const rightCrop = source.recipe.split.rightCrop
+            ? {
+                x: source.recipe.split.rightCrop.x * widthScale,
+                y: source.recipe.split.rightCrop.y * heightScale,
+                width: source.recipe.split.rightCrop.width * widthScale,
+                height: source.recipe.split.rightCrop.height * heightScale,
+              }
+            : undefined;
+
           return {
             ...asset,
             recipe: {
               ...asset.recipe,
               split: {
                 ...source.recipe.split,
-                leftCrop: source.recipe.split.leftCrop ? { ...source.recipe.split.leftCrop } : undefined,
-                rightCrop: source.recipe.split.rightCrop ? { ...source.recipe.split.rightCrop } : undefined,
+                leftCrop,
+                rightCrop,
               },
             },
           };
@@ -452,6 +479,40 @@ export const useAppStore = create<AppStore>((set, get) => ({
         }),
       })),
     );
+  },
+  saveColorPreset(name, assetId) {
+    const asset = get().project.assets.find((current) => current.id === assetId);
+    if (!asset || !name.trim()) {
+      return;
+    }
+
+    set(
+      updateAndPersist((project) => ({
+        ...project,
+        colorPresets: [
+          {
+            id: createId("preset"),
+            name: name.trim(),
+            recipe: {
+              ...asset.recipe.color,
+              curve: asset.recipe.color.curve.map((point) => ({ ...point })),
+            },
+          },
+          ...project.colorPresets,
+        ],
+      })),
+    );
+  },
+  applyColorPreset(presetId, assetIds) {
+    const preset = get().project.colorPresets.find((item) => item.id === presetId);
+    if (!preset) {
+      return;
+    }
+
+    get().updateColor(assetIds, {
+      ...preset.recipe,
+      curve: preset.recipe.curve.map((point) => ({ ...point })),
+    });
   },
   updateExportSettings(patch) {
     set(
@@ -506,17 +567,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
       jobs: state.jobs.filter((job) => job.id !== jobId),
     }));
   },
-}));
+}), shallow);
 
 export function useAssets() {
-  return useAppStore((state) => {
-    const query = state.searchQuery.trim().toLowerCase();
+  const assets = useAppStore((state) => state.project.assets);
+  const query = useAppStore((state) => state.searchQuery);
 
-    if (!query) {
-      return state.project.assets;
+  return useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+
+    if (!normalized) {
+      return assets;
     }
 
-    return state.project.assets.filter((asset) => {
+    return assets.filter((asset) => {
       return [
         asset.originalName,
         asset.metadata.cameraModel,
@@ -525,20 +589,26 @@ export function useAssets() {
         asset.metadata.notes,
       ]
         .filter(Boolean)
-        .some((value) => value?.toLowerCase().includes(query));
+        .some((value) => value?.toLowerCase().includes(normalized));
     });
-  });
+  }, [assets, query]);
 }
 
 export function useActiveAsset() {
-  return useAppStore((state) => {
-    return state.project.assets.find((asset) => asset.id === state.activeAssetId) ?? null;
-  });
+  const assets = useAppStore((state) => state.project.assets);
+  const activeAssetId = useAppStore((state) => state.activeAssetId);
+
+  return useMemo(() => {
+    return assets.find((asset) => asset.id === activeAssetId) ?? null;
+  }, [activeAssetId, assets]);
 }
 
 export function useSelectedAssets() {
-  return useAppStore((state) => {
-    const selected = new Set(state.selectedAssetIds);
-    return state.project.assets.filter((asset) => selected.has(asset.id));
-  });
+  const assets = useAppStore((state) => state.project.assets);
+  const selectedAssetIds = useAppStore((state) => state.selectedAssetIds);
+
+  return useMemo(() => {
+    const selected = new Set(selectedAssetIds);
+    return assets.filter((asset) => selected.has(asset.id));
+  }, [assets, selectedAssetIds]);
 }

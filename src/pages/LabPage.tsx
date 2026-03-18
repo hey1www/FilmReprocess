@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AssetStrip } from "../components/library/AssetStrip";
 import { CurveEditor } from "../components/lab/CurveEditor";
 import { HistogramChart } from "../components/lab/HistogramChart";
@@ -19,7 +20,11 @@ export function LabPage() {
   const selectAssetRange = useAppStore((state) => state.selectAssetRange);
   const setPreviewTarget = useAppStore((state) => state.setPreviewTarget);
   const updateColor = useAppStore((state) => state.updateColor);
+  const colorPresets = useAppStore((state) => state.project.colorPresets);
+  const saveColorPreset = useAppStore((state) => state.saveColorPreset);
+  const applyColorPreset = useAppStore((state) => state.applyColorPreset);
   const { url, histogram, loading } = useRenderedPreview(activeAsset, previewTarget);
+  const [presetName, setPresetName] = useState("");
 
   return (
     <section className="workspace workspace--editor">
@@ -120,6 +125,38 @@ export function LabPage() {
               points={activeAsset.recipe.color.curve}
               onChange={(curve) => updateColor([activeAsset.id], { curve })}
             />
+            <div className="panel__header">
+              <h3>{t("label.presets")}</h3>
+            </div>
+            <label className="field">
+              <span>{t("field.presetName")}</span>
+              <input value={presetName} onChange={(event) => setPresetName(event.target.value)} />
+            </label>
+            <div className="toolbar">
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={() => {
+                  saveColorPreset(presetName, activeAsset.id);
+                  setPresetName("");
+                }}
+              >
+                {t("action.savePreset")}
+              </button>
+            </div>
+            <div className="preset-list">
+              {colorPresets.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  className="preset-list__item"
+                  onClick={() => applyColorPreset(preset.id, selectedAssetIds)}
+                >
+                  <strong>{preset.name}</strong>
+                  <span>{t("action.applyPreset")}</span>
+                </button>
+              ))}
+            </div>
             <button type="button" className="button" onClick={() => updateColor(selectedAssetIds, activeAsset.recipe.color)}>
               {t("action.copyToSelected")}
             </button>
