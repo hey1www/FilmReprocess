@@ -24,12 +24,13 @@ function createSyntheticHalfFrame(width: number, height: number) {
 }
 
 describe("detectHalfFrameFromImageData", () => {
-  it("finds a center split with reasonable confidence", () => {
+  it("finds a center split and excludes the black divider band", () => {
     const result = detectHalfFrameFromImageData(createSyntheticHalfFrame(200, 100));
 
     expect(result.confidence).toBeGreaterThan(0.2);
     expect(result.leftCrop.width).toBeGreaterThan(10);
     expect(result.rightCrop.width).toBeGreaterThan(10);
-    expect(result.rightCrop.x).toBeGreaterThan(40);
+    expect(result.leftCrop.x + result.leftCrop.width).toBeLessThan(98);
+    expect(result.rightCrop.x).toBeGreaterThan(102);
   });
 });

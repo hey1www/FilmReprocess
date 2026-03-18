@@ -60,6 +60,56 @@ function mean(values: number[]) {
   return values.reduce((total, value) => total + value, 0) / Math.max(1, values.length);
 }
 
+function findGapBounds(
+  normalizedBrightness: number[],
+  normalizedEnergy: number[],
+  splitX: number,
+  start: number,
+  end: number,
+) {
+  const darkness = normalizedBrightness.map((value) => 1 - value);
+  const quietness = normalizedEnergy.map((value) => 1 - value);
+  const scores = darkness.map((value, index) => value * 0.7 + quietness[index] * 0.3);
+  const peakScore = scores[splitX];
+  const scoreThreshold = Math.max(0.4, peakScore * 0.68);
+  const darknessThreshold = Math.max(0.54, darkness[splitX] * 0.72);
+
+  let gapStart = splitX;
+  while (gapStart > start) {
+    const index = gapStart - 1;
+    if (scores[index] < scoreThreshold || darkness[index] < darknessThreshold) {
+      break;
+    }
+    gapStart = index;
+  }
+
+  let gapEnd = splitX + 1;
+  while (gapEnd < end) {
+    const index = gapEnd;
+    if (scores[index] < scoreThreshold || darkness[index] < darknessThreshold) {
+      break;
+    }
+    gapEnd += 1;
+  }
+
+  const padding = clamp(Math.round((end - start) * 0.006), 1, 10);
+  gapStart = clamp(gapStart - padding, start, end - 1);
+  gapEnd = clamp(gapEnd + padding, gapStart + 1, end);
+
+  const maxGapWidth = clamp(Math.round((end - start) * 0.16), 4, 48);
+  if (gapEnd - gapStart > maxGapWidth) {
+    return {
+      start: splitX,
+      end: splitX + 1,
+    };
+  }
+
+  return {
+    start: gapStart,
+    end: gapEnd,
+  };
+}
+
 export function detectHalfFrameFromImageData(imageData: ImageData): SplitDetectionResult {
   const { width, height, data } = imageData;
 
@@ -118,32 +168,36 @@ export function detectHalfFrameFromImageData(imageData: ImageData): SplitDetecti
     }
   }
 
-  const leftBounds = findEdgeBounds(smoothColumns, 0, splitX);
-  const rightBounds = findEdgeBounds(smoothColumns, splitX, width);
+  const gapBounds = findGapBounds(normalizedBrightness, normalizedEnergy, splitX, centerStart, centerEnd);
   const verticalBounds = findEdgeBounds(smooth(rowEnergy, Math.max(2, Math.floor(height * 0.01))), 0, height);
 
   const leftCrop: Rect = {
-    x: clamp(leftBounds.start, 0, width - 1),
+    x: 0,
     y: clamp(verticalBounds.start, 0, height - 1),
-    width: clamp(splitX - leftBounds.start, width * 0.1, width),
+    width: clamp(gapBounds.start, width * 0.1, width),
     height: clamp(verticalBounds.end - verticalBounds.start, height * 0.1, height),
   };
 
   const rightCrop: Rect = {
-    x: clamp(splitX, 0, width - 1),
+    x: clamp(gapBounds.end, 0, width - 1),
     y: clamp(verticalBounds.start, 0, height - 1),
-    width: clamp(rightBounds.end - splitX, width * 0.1, width),
+    width: clamp(width - gapBounds.end, width * 0.1, width),
     height: clamp(verticalBounds.end - verticalBounds.start, height * 0.1, height),
   };
 
   const leftRatio = leftCrop.width / width;
   const rightRatio = rightCrop.width / width;
   const balanceScore = 1 - Math.abs(leftRatio - rightRatio);
+  const gapWidthScore = clamp((gapBounds.end - gapBounds.start) / Math.max(4, width * 0.025), 0, 1);
   const centerWindow = normalizedBrightness.slice(centerStart, centerEnd);
   const centerMean = mean(centerWindow);
   const gapDarkness = clamp(1 - normalizedBrightness[splitX] + centerMean * 0.1, 0, 1);
   const gapQuietness = clamp(1 - normalizedEnergy[splitX], 0, 1);
-  const confidence = clamp(gapDarkness * 0.5 + gapQuietness * 0.2 + balanceScore * 0.3, 0.15, 0.98);
+  const confidence = clamp(
+    gapDarkness * 0.42 + gapQuietness * 0.18 + balanceScore * 0.24 + gapWidthScore * 0.16,
+    0.15,
+    0.98,
+  );
 
   if (leftCrop.width < width * 0.14 || rightCrop.width < width * 0.14 || confidence < 0.28) {
     return {

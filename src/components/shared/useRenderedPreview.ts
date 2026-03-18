@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { renderProcessedBlob } from "../../services/imagePipeline";
-import { getRenderSpec } from "../../services/renderSpec";
+import { getColorRecipeForContent, getRenderSpec } from "../../services/renderSpec";
 import type { Asset, HistogramBins, PreviewTarget } from "../../types/models";
 import { useAppStore } from "../../store/useAppStore";
 
@@ -28,9 +28,10 @@ export function useRenderedPreview(asset: Asset | null, target: PreviewTarget) {
         }
 
         const spec = getRenderSpec(asset, target);
+        const color = getColorRecipeForContent(asset, target !== "original");
         const rendered = await renderProcessedBlob({
           file,
-          color: asset.recipe.color,
+          color,
           crop: spec.crop,
           rotation: spec.rotation,
           maxEdge: 1400,

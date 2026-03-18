@@ -70,7 +70,7 @@ export function LabPage() {
 
       <aside className="panel panel--inspector">
         {activeAsset ? (
-          <div className="control-stack">
+          <div className="control-stack control-stack--compact">
             <label className="checkbox">
               <input
                 type="checkbox"
@@ -97,7 +97,7 @@ export function LabPage() {
               ["blackPoint", 0, 0.3, 0.01],
               ["whitePoint", 0.7, 1, 0.01],
             ].map(([field, min, max, step]) => (
-              <label key={field} className="field">
+              <label key={field} className="field field--slider">
                 <span>{t(`field.${field}`)}</span>
                 <input
                   type="range"

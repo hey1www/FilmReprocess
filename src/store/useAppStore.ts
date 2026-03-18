@@ -161,6 +161,113 @@ async function createAssetFromFile(entry: ImportFileEntry) {
   };
 }
 
+function cloneDefaultColorRecipe() {
+  return {
+    ...defaultColorRecipe,
+    curve: defaultColorRecipe.curve.map((point) => ({ ...point })),
+  };
+}
+
+function isLegacyNeutralColorRecipe(recipe: ColorRecipe) {
+  if (recipe.invertNegative || recipe.removeMask) {
+    return false;
+  }
+
+  if (
+    recipe.exposure !== 0 ||
+    recipe.contrast !== 0 ||
+    recipe.saturation !== 0 ||
+    recipe.temperature !== 0 ||
+    recipe.tint !== 0 ||
+    recipe.blackPoint !== 0 ||
+    recipe.whitePoint !== 1
+  ) {
+    return false;
+  }
+
+  if (recipe.curve.length !== defaultColorRecipe.curve.length) {
+    return false;
+  }
+
+  return recipe.curve.every((point, index) => {
+    const baseline = defaultColorRecipe.curve[index];
+    return point.x === baseline.x && point.y === baseline.y;
+  });
+}
+
+function normalizeColorRecipe(recipe?: Partial<ColorRecipe>) {
+  const next = {
+    ...cloneDefaultColorRecipe(),
+    ...recipe,
+    curve:
+      recipe?.curve && recipe.curve.length > 0
+        ? recipe.curve.map((point) => ({ ...point }))
+        : defaultColorRecipe.curve.map((point) => ({ ...point })),
+  };
+
+  if (isLegacyNeutralColorRecipe(next)) {
+    next.invertNegative = true;
+    next.removeMask = true;
+  }
+
+  return next;
+}
+
+function normalizeProjectSnapshot(project: ProjectSnapshot) {
+  let changed = false;
+
+  const colorPresets =
+    project.colorPresets && project.colorPresets.length > 0 ? project.colorPresets : createDefaultPresets();
+  if (colorPresets !== project.colorPresets) {
+    changed = true;
+  }
+
+  const assets = project.assets.map((asset) => {
+    const normalizedColor = normalizeColorRecipe(asset.recipe.color);
+    const curveChanged =
+      normalizedColor.curve.length !== asset.recipe.color.curve.length ||
+      normalizedColor.curve.some((point, index) => {
+        const current = asset.recipe.color.curve[index];
+        return !current || current.x !== point.x || current.y !== point.y;
+      });
+    const colorChanged =
+      curveChanged ||
+      normalizedColor.invertNegative !== asset.recipe.color.invertNegative ||
+      normalizedColor.removeMask !== asset.recipe.color.removeMask ||
+      normalizedColor.exposure !== asset.recipe.color.exposure ||
+      normalizedColor.contrast !== asset.recipe.color.contrast ||
+      normalizedColor.saturation !== asset.recipe.color.saturation ||
+      normalizedColor.temperature !== asset.recipe.color.temperature ||
+      normalizedColor.tint !== asset.recipe.color.tint ||
+      normalizedColor.blackPoint !== asset.recipe.color.blackPoint ||
+      normalizedColor.whitePoint !== asset.recipe.color.whitePoint;
+
+    if (!colorChanged) {
+      return asset;
+    }
+
+    changed = true;
+    return {
+      ...asset,
+      recipe: {
+        ...asset.recipe,
+        color: normalizedColor,
+      },
+    };
+  });
+
+  return {
+    changed,
+    project: changed
+      ? {
+          ...project,
+          assets,
+          colorPresets,
+        }
+      : project,
+  };
+}
+
 export const useAppStore = createWithEqualityFn<AppStore>((set, get) => ({
   ready: false,
   project: createEmptyProject(),
@@ -174,9 +281,10 @@ export const useAppStore = createWithEqualityFn<AppStore>((set, get) => ({
   sessionFiles: {},
   thumbnailUrls: {},
   async bootstrap() {
-    const project = await loadProjectSnapshot();
-    if (!project.colorPresets || project.colorPresets.length === 0) {
-      project.colorPresets = createDefaultPresets();
+    const loadedProject = await loadProjectSnapshot();
+    const { changed, project } = normalizeProjectSnapshot(loadedProject);
+    if (changed) {
+      void persistProjectSnapshot(project);
     }
     const thumbnailUrls = await hydrateThumbnails(project);
 
