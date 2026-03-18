@@ -80,7 +80,7 @@ export function LibraryPage() {
           {!canPickDirectory ? <p className="muted">{t("hint.folderFallback")}</p> : null}
         </div>
         <div className="toolbar toolbar--wrap">
-          <label className="field field--grow">
+          <label className="field field--inline field--grow">
             <span>{t("field.search")}</span>
             <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
           </label>

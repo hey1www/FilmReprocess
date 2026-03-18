@@ -19,6 +19,27 @@ function updateRect(asset: Asset, side: "left" | "right", rect: Rect) {
   };
 }
 
+function createFallbackRect(width: number, height: number, side: "left" | "right"): Rect {
+  const gutter = Math.min(Math.max(width * 0.015, 12), 48);
+  const halfWidth = Math.max((width - gutter) / 2, 20);
+
+  if (side === "left") {
+    return {
+      x: 0,
+      y: 0,
+      width: halfWidth,
+      height,
+    };
+  }
+
+  return {
+    x: width - halfWidth,
+    y: 0,
+    width: halfWidth,
+    height,
+  };
+}
+
 export function SplitPage() {
   const { t } = useI18n();
   const assets = useAssets();
@@ -33,8 +54,9 @@ export function SplitPage() {
   const copySplitToSelected = useAppStore((state) => state.copySplitToSelected);
   const { fileUrl, loading } = useAssetFileUrl(activeAsset?.id ?? null);
 
-  const leftRect = activeAsset?.recipe.split.leftCrop;
-  const rightRect = activeAsset?.recipe.split.rightCrop;
+  const leftRect = activeAsset?.recipe.split.leftCrop ?? (activeAsset ? createFallbackRect(activeAsset.width, activeAsset.height, "left") : undefined);
+  const rightRect = activeAsset?.recipe.split.rightCrop ?? (activeAsset ? createFallbackRect(activeAsset.width, activeAsset.height, "right") : undefined);
+  const hasStoredSplit = Boolean(activeAsset?.recipe.split.leftCrop && activeAsset?.recipe.split.rightCrop);
 
   return (
     <section className="workspace workspace--editor">
@@ -76,27 +98,30 @@ export function SplitPage() {
         {!activeAsset ? <div className="empty-card">{t("empty.noSelection")}</div> : null}
         {loading ? <div className="empty-card">{t("status.running")}</div> : null}
         {activeAsset && fileUrl && leftRect && rightRect ? (
-          <CropEditor
-            imageUrl={fileUrl}
-            naturalWidth={activeAsset.width}
-            naturalHeight={activeAsset.height}
-            leftRect={leftRect}
-            rightRect={rightRect}
-            activeSide={activeAsset.recipe.split.activeSide}
-            onActiveSideChange={(side) =>
-              updateSplit(activeAsset.id, (asset) => ({
-                ...asset,
-                recipe: {
-                  ...asset.recipe,
-                  split: {
-                    ...asset.recipe.split,
-                    activeSide: side,
+          <>
+            {!hasStoredSplit ? <p className="muted">{t("hint.splitManualStart")}</p> : null}
+            <CropEditor
+              imageUrl={fileUrl}
+              naturalWidth={activeAsset.width}
+              naturalHeight={activeAsset.height}
+              leftRect={leftRect}
+              rightRect={rightRect}
+              activeSide={activeAsset.recipe.split.activeSide}
+              onActiveSideChange={(side) =>
+                updateSplit(activeAsset.id, (asset) => ({
+                  ...asset,
+                  recipe: {
+                    ...asset.recipe,
+                    split: {
+                      ...asset.recipe.split,
+                      activeSide: side,
+                    },
                   },
-                },
-              }))
-            }
-            onRectChange={(side, rect) => updateSplit(activeAsset.id, (asset) => updateRect(asset, side, rect))}
-          />
+                }))
+              }
+              onRectChange={(side, rect) => updateSplit(activeAsset.id, (asset) => updateRect(asset, side, rect))}
+            />
+          </>
         ) : null}
       </div>
 

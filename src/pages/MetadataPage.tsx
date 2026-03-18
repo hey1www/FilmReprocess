@@ -58,7 +58,7 @@ export function MetadataPage() {
   );
 
   return (
-    <section className="workspace workspace--editor">
+    <section className="workspace workspace--editor workspace--editor-wide">
       <div className="panel panel--rail">
         <div className="panel__header">
           <h1>{t("nav.metadata")}</h1>
@@ -186,19 +186,6 @@ export function MetadataPage() {
           </button>
         </div>
       </div>
-
-      <aside className="panel panel--inspector">
-        <div className="panel__header">
-          <h2>{t("panel.selection")}</h2>
-        </div>
-        <p className="muted">
-          {t("library.summary", {
-            count: assets.length,
-            selected: selectedAssets.length,
-          })}
-        </p>
-        {activeAsset ? <p>{activeAsset.originalName}</p> : <p className="muted">{t("empty.noSelection")}</p>}
-      </aside>
 
       {showMap ? (
         <MapPicker

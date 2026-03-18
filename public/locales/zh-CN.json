@@ -93,6 +93,7 @@
   "hint.folderFallback": "当前浏览器不支持目录选择器，可使用“导入照片”或兼容的 Chromium 浏览器。",
   "hint.handlePersistence": "通过目录句柄导入的项目在 Chromium 浏览器中可跨刷新恢复；普通文件导入默认为当前会话。",
   "hint.split": "自动识别会给出左右裁剪框初值，你可以拖动框体和角点进行修正。",
+  "hint.splitManualStart": "先自动识别半格，或直接拖动左右框开始手动剪裁。",
   "hint.lab": "预览使用代理图实时渲染，导出时会回到原图重新计算。",
   "hint.export": "命名模板支持 {name}、{side}、{index}、{date}、{camera}。",
   "hint.mapSearch": "地点搜索使用 OpenStreetMap 的 Nominatim 服务，适合低频个人使用。",

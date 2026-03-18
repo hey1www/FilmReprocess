@@ -19,20 +19,17 @@
 
 @media (max-width: 860px) {
   .topbar {
-    grid-template-columns: 1fr;
     align-items: stretch;
   }
 
-  .topbar__controls {
-    justify-content: stretch;
-  }
-
-  .topbar__project {
-    flex-basis: 100%;
+  .topbar__workflow {
+    align-items: stretch;
+    flex-wrap: wrap;
   }
 
   .workflow-nav {
     gap: var(--space-2);
+    flex-basis: 100%;
   }
 
   .form-grid {
@@ -67,7 +64,18 @@
     flex-wrap: wrap;
   }
 
-  .topbar__controls {
+  .field--inline {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .field--inline input:not([type="range"]):not([type="checkbox"]),
+  .field--inline select,
+  .field--inline textarea {
+    width: 100%;
+  }
+
+  .topbar__workflow {
     flex-wrap: wrap;
   }
 }
