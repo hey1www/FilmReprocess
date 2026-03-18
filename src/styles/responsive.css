@@ -19,10 +19,12 @@
 
 @media (max-width: 860px) {
   .topbar {
+    flex-wrap: wrap;
     align-items: stretch;
   }
 
   .topbar__workflow {
+    flex-basis: 100%;
     align-items: stretch;
     flex-wrap: wrap;
   }

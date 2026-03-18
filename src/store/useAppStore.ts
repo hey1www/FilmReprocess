@@ -71,6 +71,7 @@ type AppStore = {
   ) => void;
   autoDetectSplit: (assetIds: string[]) => Promise<void>;
   copySplitToSelected: (sourceAssetId: string) => void;
+  copySplitToAssets: (sourceAssetId: string, targetAssetIds: string[]) => void;
   updateColor: (assetIds: string[], patch: Partial<ColorRecipe>) => void;
   saveColorPreset: (name: string, assetId: string) => void;
   applyColorPreset: (presetId: string, assetIds: string[]) => void;
@@ -514,13 +515,21 @@ export const useAppStore = createWithEqualityFn<AppStore>((set, get) => ({
     });
   },
   copySplitToSelected(sourceAssetId) {
+    const targetIds = get().selectedAssetIds.filter((assetId) => assetId !== sourceAssetId);
+    get().copySplitToAssets(sourceAssetId, targetIds);
+  },
+  copySplitToAssets(sourceAssetId, targetAssetIds) {
     const source = get().project.assets.find((asset) => asset.id === sourceAssetId);
 
     if (!source) {
       return;
     }
 
-    const selectedIds = new Set(get().selectedAssetIds.filter((assetId) => assetId !== sourceAssetId));
+    const selectedIds = new Set(targetAssetIds.filter((assetId) => assetId !== sourceAssetId));
+
+    if (selectedIds.size === 0) {
+      return;
+    }
 
     set(
       updateAndPersist((project) => ({

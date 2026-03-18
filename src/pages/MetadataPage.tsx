@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AssetStrip } from "../components/library/AssetStrip";
 import { MapPicker } from "../components/metadata/MapPicker";
+import { SelectionScopeBar } from "../components/shared/SelectionScopeBar";
 import { useI18n } from "../features/i18n/I18nProvider";
 import { useActiveAsset, useAppStore, useAssets, useSelectedAssets } from "../store/useAppStore";
 import type { AssetLocation, BatchMetadataPatch, MetadataMergeStrategy } from "../types/models";
+import type { ApplyScope } from "../utils/applyScope";
+import { getScopedAssetIds } from "../utils/applyScope";
 
 const initialLocation: AssetLocation = {
   lat: 22.3193,
@@ -13,6 +17,7 @@ const initialLocation: AssetLocation = {
 
 export function MetadataPage() {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const assets = useAssets();
   const activeAsset = useActiveAsset();
   const selectedAssets = useSelectedAssets();
@@ -23,6 +28,7 @@ export function MetadataPage() {
   const selectAssetRange = useAppStore((state) => state.selectAssetRange);
   const updateMetadata = useAppStore((state) => state.updateMetadata);
   const [showMap, setShowMap] = useState(false);
+  const [applyScope, setApplyScope] = useState<ApplyScope>(selectedAssets.length > 1 ? "selected" : "current");
   const [strategy, setStrategy] = useState<MetadataMergeStrategy>("selected-only");
   const [selectedFields, setSelectedFields] = useState<Array<keyof BatchMetadataPatch>>([
     "shotAt",
@@ -53,8 +59,8 @@ export function MetadataPage() {
 
   const isBatch = selectedAssets.length > 1;
   const targetIds = useMemo(
-    () => (selectedAssetIds.length > 0 ? selectedAssetIds : activeAsset ? [activeAsset.id] : []),
-    [activeAsset, selectedAssetIds],
+    () => getScopedAssetIds({ scope: applyScope, assets, activeAssetId, selectedAssetIds }),
+    [activeAssetId, applyScope, assets, selectedAssetIds],
   );
 
   return (
@@ -83,7 +89,24 @@ export function MetadataPage() {
       <div className="panel panel--form">
         <div className="panel__header">
           <h2>{t("panel.metadata")}</h2>
+          <button
+            type="button"
+            className="button button--secondary"
+            disabled={assets.length === 0}
+            onClick={() => navigate("/split")}
+          >
+            {t("action.nextStep")} · {t("nav.split")}
+          </button>
         </div>
+
+        <SelectionScopeBar
+          activeAssetName={activeAsset?.originalName ?? null}
+          selectedCount={selectedAssetIds.length}
+          totalCount={assets.length}
+          targetCount={targetIds.length}
+          scope={applyScope}
+          onScopeChange={setApplyScope}
+        />
 
         <div className="form-grid">
           <label className="field">
@@ -148,30 +171,32 @@ export function MetadataPage() {
           </label>
         </div>
 
-        <div className="toolbar toolbar--wrap">
-          <label className="field field--compact">
-            <span>{t("field.strategy")}</span>
-            <select value={strategy} onChange={(event) => setStrategy(event.target.value as MetadataMergeStrategy)}>
-              <option value="selected-only">{t("strategy.selected-only")}</option>
-              <option value="fill-empty">{t("strategy.fill-empty")}</option>
-              <option value="overwrite">{t("strategy.overwrite")}</option>
-            </select>
-          </label>
-          {(Object.keys(draft) as Array<keyof BatchMetadataPatch>).map((field) => (
-            <label key={field} className="checkbox">
-              <input
-                type="checkbox"
-                checked={selectedFields.includes(field)}
-                onChange={(event) =>
-                  setSelectedFields((current) =>
-                    event.target.checked ? [...current, field] : current.filter((item) => item !== field),
-                  )
-                }
-              />
-              <span>{t(`field.${field}`)}</span>
+        {applyScope !== "current" ? (
+          <div className="toolbar toolbar--wrap">
+            <label className="field field--compact">
+              <span>{t("field.strategy")}</span>
+              <select value={strategy} onChange={(event) => setStrategy(event.target.value as MetadataMergeStrategy)}>
+                <option value="selected-only">{t("strategy.selected-only")}</option>
+                <option value="fill-empty">{t("strategy.fill-empty")}</option>
+                <option value="overwrite">{t("strategy.overwrite")}</option>
+              </select>
             </label>
-          ))}
-        </div>
+            {(Object.keys(draft) as Array<keyof BatchMetadataPatch>).map((field) => (
+              <label key={field} className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedFields.includes(field)}
+                  onChange={(event) =>
+                    setSelectedFields((current) =>
+                      event.target.checked ? [...current, field] : current.filter((item) => item !== field),
+                    )
+                  }
+                />
+                <span>{t(`field.${field}`)}</span>
+              </label>
+            ))}
+          </div>
+        ) : null}
 
         <div className="toolbar">
           <button type="button" className="button button--secondary" onClick={() => setShowMap(true)}>
@@ -180,6 +205,7 @@ export function MetadataPage() {
           <button
             type="button"
             className="button"
+            disabled={targetIds.length === 0}
             onClick={() => updateMetadata(targetIds, draft, strategy, selectedFields)}
           >
             {t("action.applyMetadata")}

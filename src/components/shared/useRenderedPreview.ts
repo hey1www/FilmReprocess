@@ -4,11 +4,20 @@ import { getColorRecipeForContent, getRenderSpec } from "../../services/renderSp
 import type { Asset, HistogramBins, PreviewTarget } from "../../types/models";
 import { useAppStore } from "../../store/useAppStore";
 
-export function useRenderedPreview(asset: Asset | null, target: PreviewTarget) {
+export function useRenderedPreview(
+  asset: Asset | null,
+  target: PreviewTarget,
+  options?: {
+    applyColor?: boolean;
+    maxEdge?: number;
+  },
+) {
   const resolveAssetFile = useAppStore((state) => state.resolveAssetFile);
   const [url, setUrl] = useState<string | null>(null);
   const [histogram, setHistogram] = useState<HistogramBins | null>(null);
   const [loading, setLoading] = useState(false);
+  const applyColor = options?.applyColor ?? true;
+  const maxEdge = options?.maxEdge ?? 1400;
 
   useEffect(() => {
     if (!asset) {
@@ -28,13 +37,13 @@ export function useRenderedPreview(asset: Asset | null, target: PreviewTarget) {
         }
 
         const spec = getRenderSpec(asset, target);
-        const color = getColorRecipeForContent(asset, target !== "original");
+        const color = getColorRecipeForContent(asset, applyColor && target !== "original");
         const rendered = await renderProcessedBlob({
           file,
           color,
           crop: spec.crop,
           rotation: spec.rotation,
-          maxEdge: 1400,
+          maxEdge,
           output: {
             format: "image/jpeg",
             quality: 0.9,
@@ -61,7 +70,7 @@ export function useRenderedPreview(asset: Asset | null, target: PreviewTarget) {
         URL.revokeObjectURL(revoked);
       }
     };
-  }, [asset, resolveAssetFile, target]);
+  }, [applyColor, asset, maxEdge, resolveAssetFile, target]);
 
   return {
     url,

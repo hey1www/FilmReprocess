@@ -1,4 +1,5 @@
 import { useRef, type MouseEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { AssetGrid } from "../components/library/AssetGrid";
 import { useI18n } from "../features/i18n/I18nProvider";
 import { supportsDirectoryPicker } from "../services/fileAccess";
@@ -32,6 +33,7 @@ export function LibraryPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
   const { t } = useI18n();
+  const navigate = useNavigate();
   const canPickDirectory = supportsDirectoryPicker();
   const assets = useAssets();
   const activeAsset = useActiveAsset();
@@ -51,13 +53,23 @@ export function LibraryPage() {
     <section className="workspace workspace--library">
       <div className="panel">
         <div className="panel__header">
-          <h1>{t("nav.library")}</h1>
-          <p className="muted">
-            {t("library.summary", {
-              count: assets.length,
-              selected: selectedAssetIds.length,
-            })}
-          </p>
+          <div>
+            <h1>{t("nav.library")}</h1>
+            <p className="muted">
+              {t("library.summary", {
+                count: assets.length,
+                selected: selectedAssetIds.length,
+              })}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="button button--secondary"
+            disabled={assets.length === 0}
+            onClick={() => navigate("/metadata")}
+          >
+            {t("action.nextStep")} · {t("nav.metadata")}
+          </button>
         </div>
         <div className="toolbar toolbar--wrap">
           <button type="button" className="button" onClick={() => fileInputRef.current?.click()}>
@@ -84,12 +96,16 @@ export function LibraryPage() {
             <span>{t("field.search")}</span>
             <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
           </label>
-          <button type="button" className="button button--secondary" onClick={selectAll}>
-            {t("action.selectAll")}
-          </button>
-          <button type="button" className="button button--secondary" onClick={clearSelection}>
-            {t("action.clearSelection")}
-          </button>
+          {assets.length > 1 ? (
+            <>
+              <button type="button" className="button button--secondary" onClick={selectAll}>
+                {t("action.selectAll")}
+              </button>
+              <button type="button" className="button button--secondary" onClick={clearSelection}>
+                {t("action.clearSelection")}
+              </button>
+            </>
+          ) : null}
         </div>
         <AssetGrid
           assets={assets}
