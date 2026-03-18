@@ -8,7 +8,6 @@ import { LabPage } from "../pages/LabPage";
 import { ExportPage } from "../pages/ExportPage";
 import { useAppStore } from "../store/useAppStore";
 import { JobPanel } from "../components/layout/JobPanel";
-import { SidebarNav } from "../components/layout/SidebarNav";
 import { TopBar } from "../components/layout/TopBar";
 import { useI18n } from "../features/i18n/I18nProvider";
 
@@ -30,7 +29,6 @@ function AppFrame() {
       <div className="app-shell">
         <TopBar />
         <div className="app-shell__body">
-          <SidebarNav />
           <main className="app-shell__content">
             <Routes>
               <Route path="/" element={<LibraryPage />} />

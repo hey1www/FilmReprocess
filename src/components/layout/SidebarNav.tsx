@@ -13,13 +13,13 @@ export function SidebarNav() {
   const { t } = useI18n();
 
   return (
-    <nav className="sidebar">
+    <nav className="workflow-nav" aria-label="Workflow">
       {items.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
           end={item.end}
-          className={({ isActive }) => `sidebar__link${isActive ? " sidebar__link--active" : ""}`}
+          className={({ isActive }) => `workflow-nav__link${isActive ? " workflow-nav__link--active" : ""}`}
         >
           {t(item.label)}
         </NavLink>

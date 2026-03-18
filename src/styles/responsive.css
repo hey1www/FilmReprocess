@@ -20,22 +20,19 @@
 @media (max-width: 860px) {
   .topbar {
     grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
-  .app-shell__body {
-    grid-template-columns: 1fr;
+  .topbar__controls {
+    justify-content: stretch;
   }
 
-  .sidebar {
-    flex-direction: row;
-    overflow: auto;
-    padding: var(--space-3) var(--space-5);
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+  .topbar__project {
+    flex-basis: 100%;
   }
 
-  .sidebar__link {
-    white-space: nowrap;
+  .workflow-nav {
+    gap: var(--space-2);
   }
 
   .form-grid {
@@ -70,7 +67,7 @@
     flex-wrap: wrap;
   }
 
-  .topbar__actions {
+  .topbar__controls {
     flex-wrap: wrap;
   }
 }

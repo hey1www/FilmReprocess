@@ -68,7 +68,7 @@ async function runDesktopFlow(browser) {
   await page.waitForFunction(() => document.querySelectorAll(".asset-card").length >= 2);
   await page.screenshot({ path: path.join(outputDir, "02-library-imported.png"), fullPage: true });
 
-  await page.getByRole("link", { name: /Metadata|元数据/ }).click();
+  await page.getByRole("link", { name: /Image Info|图片信息/ }).click();
   await page.waitForURL(/#\/metadata/);
   await page.locator('.panel--form input[type="datetime-local"]').fill("2026-03-18T18:45");
   await page.locator('.panel--form input').nth(1).fill("Olympus Pen FT");
@@ -82,7 +82,7 @@ async function runDesktopFlow(browser) {
   await page.getByRole("button", { name: /Apply Metadata|应用元数据/ }).click();
   await page.screenshot({ path: path.join(outputDir, "03-metadata-applied.png"), fullPage: true });
 
-  await page.getByRole("link", { name: /Split|半格拆分/ }).click();
+  await page.getByRole("link", { name: /Crop Adjust|Crop Adjustments|剪裁调整/ }).click();
   await page.getByRole("button", { name: /Auto Detect Halves|自动识别半格/ }).click();
   await page.waitForFunction(() => {
     const text = document.body.textContent ?? "";
@@ -92,7 +92,7 @@ async function runDesktopFlow(browser) {
   await leftRotation.fill("3");
   await page.screenshot({ path: path.join(outputDir, "04-split-adjusted.png"), fullPage: true });
 
-  await page.getByRole("link", { name: /Lab|调色/ }).click();
+  await page.getByRole("link", { name: /Color|调色/ }).click();
   await page.waitForSelector(".lab-preview__image");
   await page.getByLabel(/Preset Name|预设名称/).fill("Regression Preset");
   await page.getByRole("button", { name: /Save as Preset|保存为预设/ }).click();

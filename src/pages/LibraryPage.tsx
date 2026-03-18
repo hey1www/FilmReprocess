@@ -1,6 +1,7 @@
-import type { MouseEvent } from "react";
+import { useRef, type MouseEvent } from "react";
 import { AssetGrid } from "../components/library/AssetGrid";
 import { useI18n } from "../features/i18n/I18nProvider";
+import { supportsDirectoryPicker } from "../services/fileAccess";
 import { useActiveAsset, useAppStore, useAssets } from "../store/useAppStore";
 
 function handleSelect(
@@ -17,8 +18,21 @@ function handleSelect(
   selectAsset(assetId, event.metaKey || event.ctrlKey);
 }
 
+function mapFiles(list: FileList) {
+  return Array.from(list).map((file) => {
+    const maybeRelative = (file as File & { webkitRelativePath?: string }).webkitRelativePath;
+    return {
+      file,
+      relativePath: maybeRelative || undefined,
+    };
+  });
+}
+
 export function LibraryPage() {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
   const { t } = useI18n();
+  const canPickDirectory = supportsDirectoryPicker();
   const assets = useAssets();
   const activeAsset = useActiveAsset();
   const selectedAssetIds = useAppStore((state) => state.selectedAssetIds);
@@ -30,6 +44,8 @@ export function LibraryPage() {
   const selectAssetRange = useAppStore((state) => state.selectAssetRange);
   const selectAll = useAppStore((state) => state.selectAll);
   const clearSelection = useAppStore((state) => state.clearSelection);
+  const importFiles = useAppStore((state) => state.importFiles);
+  const importFromDirectory = useAppStore((state) => state.importFromDirectory);
 
   return (
     <section className="workspace workspace--library">
@@ -43,7 +59,27 @@ export function LibraryPage() {
             })}
           </p>
         </div>
-        <div className="toolbar">
+        <div className="toolbar toolbar--wrap">
+          <button type="button" className="button" onClick={() => fileInputRef.current?.click()}>
+            {t("action.importFiles")}
+          </button>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={() => {
+              if (canPickDirectory) {
+                void importFromDirectory();
+                return;
+              }
+
+              folderInputRef.current?.click();
+            }}
+          >
+            {t("action.importFolder")}
+          </button>
+          {!canPickDirectory ? <p className="muted">{t("hint.folderFallback")}</p> : null}
+        </div>
+        <div className="toolbar toolbar--wrap">
           <label className="field field--grow">
             <span>{t("field.search")}</span>
             <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
@@ -61,6 +97,43 @@ export function LibraryPage() {
           activeId={activeAssetId}
           thumbnailUrls={thumbnailUrls}
           onSelect={(assetId, event) => handleSelect(assetId, event, selectAsset, selectAssetRange)}
+        />
+
+        <input
+          ref={fileInputRef}
+          hidden
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(event) => {
+            const list = event.target.files;
+            if (!list) {
+              return;
+            }
+            void importFiles(mapFiles(list));
+            event.target.value = "";
+          }}
+        />
+        <input
+          ref={(node) => {
+            folderInputRef.current = node;
+            if (node) {
+              node.setAttribute("webkitdirectory", "");
+              node.setAttribute("directory", "");
+            }
+          }}
+          hidden
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(event) => {
+            const list = event.target.files;
+            if (!list) {
+              return;
+            }
+            void importFiles(mapFiles(list));
+            event.target.value = "";
+          }}
         />
       </div>
 

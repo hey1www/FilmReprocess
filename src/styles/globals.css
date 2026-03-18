@@ -52,9 +52,9 @@ a {
 
 .topbar {
   display: grid;
-  grid-template-columns: auto minmax(16rem, 24rem) auto;
-  gap: var(--space-4);
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-4) var(--space-5);
+  align-items: end;
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--line);
   background: rgba(2, 6, 23, 0.7);
@@ -74,7 +74,7 @@ a {
   font-size: 0.9rem;
 }
 
-.topbar__actions,
+.topbar__controls,
 .toolbar {
   display: flex;
   gap: var(--space-3);
@@ -85,41 +85,60 @@ a {
   flex-wrap: wrap;
 }
 
+.toolbar .muted {
+  margin: 0;
+}
+
+.topbar__controls {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
 .topbar__project {
+  min-width: min(100%, 18rem);
+  flex: 1 1 20rem;
+}
+
+.topbar__workflow {
+  grid-column: 1 / -1;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.workflow-nav {
   display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: var(--space-1);
+}
+
+.workflow-nav__link {
+  flex: 0 0 auto;
+  padding: 0.9rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  background: rgba(15, 23, 42, 0.42);
+  transition: 160ms ease;
+  white-space: nowrap;
+}
+
+.workflow-nav__link:hover,
+.workflow-nav__link--active {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: rgba(249, 115, 22, 0.26);
 }
 
 .app-shell__body {
-  display: grid;
-  grid-template-columns: var(--sidebar-width) 1fr;
   min-height: 0;
-}
-
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-5);
-  border-right: 1px solid var(--line);
-  background: rgba(2, 6, 23, 0.52);
-}
-
-.sidebar__link {
-  padding: 0.9rem 1rem;
-  border-radius: var(--radius-md);
-  color: var(--text-muted);
-  transition: 160ms ease;
-}
-
-.sidebar__link:hover,
-.sidebar__link--active {
-  color: var(--text);
-  background: var(--accent-soft);
 }
 
 .app-shell__content {
   padding: var(--space-5);
   min-width: 0;
+  min-height: 0;
 }
 
 .workspace {
