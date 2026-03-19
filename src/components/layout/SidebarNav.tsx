@@ -5,9 +5,9 @@ import type { Asset } from "../../types/models";
 
 const items = [
   { to: "/", label: "nav.library", end: true },
-  { to: "/metadata", label: "nav.metadata" },
   { to: "/split", label: "nav.split" },
   { to: "/lab", label: "nav.lab" },
+  { to: "/metadata", label: "nav.metadata" },
   { to: "/export", label: "nav.export" },
 ];
 

@@ -27,6 +27,10 @@ export async function loadThumbnail(key: string) {
   return entry?.blob;
 }
 
+export async function deleteThumbnail(key: string) {
+  await db.thumbnails.delete(key);
+}
+
 export async function persistFileHandle(id: string, handle: FileSystemFileHandle) {
   await db.handles.put({
     id,
@@ -38,4 +42,8 @@ export async function persistFileHandle(id: string, handle: FileSystemFileHandle
 export async function loadFileHandle(id: string) {
   const entry = await db.handles.get(id);
   return entry?.handle;
+}
+
+export async function deleteFileHandle(id: string) {
+  await db.handles.delete(id);
 }

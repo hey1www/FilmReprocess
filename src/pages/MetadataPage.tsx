@@ -93,9 +93,9 @@ export function MetadataPage() {
             type="button"
             className="button button--secondary"
             disabled={assets.length === 0}
-            onClick={() => navigate("/split")}
+            onClick={() => navigate("/export")}
           >
-            {t("action.nextStep")} · {t("nav.split")}
+            {t("action.nextStep")} · {t("nav.export")}
           </button>
         </div>
 

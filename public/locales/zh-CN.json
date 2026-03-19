@@ -10,6 +10,7 @@
   "action.importFolder": "导入文件夹",
   "action.selectAll": "全选",
   "action.clearSelection": "清空选择",
+  "action.removeSelected": "移除所选",
   "action.applyToSelected": "应用到所选",
   "action.copyToSelected": "应用当前调色到范围",
   "action.autoDetect": "自动识别半格",

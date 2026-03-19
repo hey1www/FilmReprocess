@@ -74,9 +74,9 @@ export function LabPage() {
               type="button"
               className="button button--secondary"
               disabled={assets.length === 0}
-              onClick={() => navigate("/export")}
+              onClick={() => navigate("/metadata")}
             >
-              {t("action.nextStep")} · {t("nav.export")}
+              {t("action.nextStep")} · {t("nav.metadata")}
             </button>
           </div>
         </div>

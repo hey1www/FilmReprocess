@@ -10,6 +10,7 @@
   "action.importFolder": "Import Folder",
   "action.selectAll": "Select All",
   "action.clearSelection": "Clear Selection",
+  "action.removeSelected": "Remove Selected",
   "action.applyToSelected": "Apply to Selected",
   "action.copyToSelected": "Apply Current Color to Scope",
   "action.autoDetect": "Auto Detect Halves",

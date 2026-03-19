@@ -46,6 +46,7 @@ export function LibraryPage() {
   const selectAssetRange = useAppStore((state) => state.selectAssetRange);
   const selectAll = useAppStore((state) => state.selectAll);
   const clearSelection = useAppStore((state) => state.clearSelection);
+  const removeAssets = useAppStore((state) => state.removeAssets);
   const importFiles = useAppStore((state) => state.importFiles);
   const importFromDirectory = useAppStore((state) => state.importFromDirectory);
 
@@ -66,9 +67,9 @@ export function LibraryPage() {
             type="button"
             className="button button--secondary"
             disabled={assets.length === 0}
-            onClick={() => navigate("/metadata")}
+            onClick={() => navigate("/split")}
           >
-            {t("action.nextStep")} · {t("nav.metadata")}
+            {t("action.nextStep")} · {t("nav.split")}
           </button>
         </div>
         <div className="toolbar toolbar--wrap">
@@ -96,6 +97,14 @@ export function LibraryPage() {
             <span>{t("field.search")}</span>
             <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
           </label>
+          <button
+            type="button"
+            className="button button--secondary"
+            disabled={selectedAssetIds.length === 0}
+            onClick={() => removeAssets(selectedAssetIds)}
+          >
+            {t("action.removeSelected")}
+          </button>
           {assets.length > 1 ? (
             <>
               <button type="button" className="button button--secondary" onClick={selectAll}>

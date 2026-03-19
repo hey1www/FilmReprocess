@@ -1,14 +1,16 @@
 {
   "baseUrl": "http://127.0.0.1:4173",
-  "completedAt": "2026-03-18T14:57:06.659Z",
+  "completedAt": "2026-03-18T15:46:04.153Z",
   "desktop": {
     "screenshots": [
       "01-library-empty.png",
       "02-library-imported.png",
-      "03-metadata-applied.png",
-      "04-split-adjusted.png",
-      "05-lab-preset.png",
-      "06-export.png"
+      "03-library-removed.png",
+      "04-library-reimported.png",
+      "05-split-adjusted.png",
+      "06-lab-preset.png",
+      "07-metadata-applied.png",
+      "08-export.png"
     ],
     "download": "film-reprocess-project.zip"
   },

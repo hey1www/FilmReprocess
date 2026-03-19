@@ -6,7 +6,16 @@ import { createDefaultPresets, createEmptyProject, defaultColorRecipe, defaultPr
 import { generateThumbnailBlob } from "../services/imageCodec";
 import { openDirectoryImages } from "../services/fileAccess";
 import { mergeMetadata } from "../services/metadataMerge";
-import { loadFileHandle, loadProjectSnapshot, loadThumbnail, persistFileHandle, persistProjectSnapshot, persistThumbnail } from "../services/persistence";
+import {
+  deleteFileHandle,
+  deleteThumbnail,
+  loadFileHandle,
+  loadProjectSnapshot,
+  loadThumbnail,
+  persistFileHandle,
+  persistProjectSnapshot,
+  persistThumbnail,
+} from "../services/persistence";
 import type {
   AppSection,
   Asset,
@@ -59,6 +68,7 @@ type AppStore = {
   selectAssetRange: (assetId: string) => void;
   clearSelection: () => void;
   selectAll: () => void;
+  removeAssets: (assetIds: string[]) => void;
   updateMetadata: (
     assetIds: string[],
     patch: BatchMetadataPatch,
@@ -444,6 +454,56 @@ export const useAppStore = createWithEqualityFn<AppStore>((set, get) => ({
       selectedAssetIds: state.project.assets.map((asset) => asset.id),
       activeAssetId: state.project.assets[0]?.id ?? null,
     }));
+  },
+  removeAssets(assetIds) {
+    const ids = new Set(assetIds);
+    if (ids.size === 0) {
+      return;
+    }
+
+    const state = get();
+    const removedAssets = state.project.assets.filter((asset) => ids.has(asset.id));
+    if (removedAssets.length === 0) {
+      return;
+    }
+
+    const remainingAssets = state.project.assets.filter((asset) => !ids.has(asset.id));
+    const selectedAssetIds = state.selectedAssetIds.filter((assetId) => !ids.has(assetId));
+    const fallbackActiveId =
+      selectedAssetIds[0] ??
+      remainingAssets.find((asset) => asset.id === state.activeAssetId)?.id ??
+      remainingAssets[0]?.id ??
+      null;
+
+    const nextProject = {
+      ...state.project,
+      assets: remainingAssets,
+    };
+
+    void persistProjectSnapshot(nextProject);
+
+    for (const asset of removedAssets) {
+      const thumbnailUrl = state.thumbnailUrls[asset.id];
+      if (thumbnailUrl) {
+        URL.revokeObjectURL(thumbnailUrl);
+      }
+      void deleteThumbnail(asset.thumbnailKey);
+      if (asset.source.handleId) {
+        void deleteFileHandle(asset.source.handleId);
+      }
+    }
+
+    set({
+      project: nextProject,
+      sessionFiles: Object.fromEntries(
+        Object.entries(state.sessionFiles).filter(([assetId]) => !ids.has(assetId)),
+      ),
+      thumbnailUrls: Object.fromEntries(
+        Object.entries(state.thumbnailUrls).filter(([assetId]) => !ids.has(assetId)),
+      ),
+      selectedAssetIds: selectedAssetIds.length > 0 ? selectedAssetIds : fallbackActiveId ? [fallbackActiveId] : [],
+      activeAssetId: fallbackActiveId,
+    });
   },
   updateMetadata(assetIds, patch, strategy, selectedFields) {
     const ids = new Set(assetIds);
